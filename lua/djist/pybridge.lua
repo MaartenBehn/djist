@@ -1,65 +1,53 @@
 local M = {}
 local uv = vim.loop
+local ui = require('djist.ui')
 
-E_SUCCESS = 0
-
-local handle, pid
-local data = {}
-
-local stdin = uv.new_pipe(false)
-local stdout = uv.new_pipe(false)
-local stderr = uv.new_pipe(false)
-
--- Close write ends of stdout and stderr as a safety precaution
-uv.shutdown(stdout)
-uv.shutdown(stderr)
-
-local function extractURLS(input_data)
-    local urls = vim.split(table.concat(input_data), '%c')
-    return urls
-end
-
-local function onRead(err, chunk)
+local function onread(err, data)
     assert(not err, err)
-    --print(chunk)
-    if (chunk) then
-        table.insert(data, chunk)
-    else
-        -- There is no more data to read
-        M.urls = extractURLS(data)
-    end
-end
-local function onshutdown(err)
-  if err == "ECANCELED" then
-    return
-  end
-  --uv.close(handle, function() return end)
-end
-
-local function onExit(code, signal)
-    print(code)
-    if code ~= E_SUCCESS then
-        error("Error running the Python script.")
+    --if data then
+        --local vals = vim.split(data, "\n")
+        --for _, d in pairs(vals) do
+            --if d == "" then goto continue end
+            --table.insert(M.urls, d)
+            --::continue::
+        --table.insert(M.urls, data)
+        --end
+    --end
+    if data then
+        table.insert(M.urls, data)
     end
 end
 
-M.runPython = function(viewName)
+M. runPython = function (args)
+    M.urls = {}
+    local stdin = uv.new_pipe(false)
+    local stdout = uv.new_pipe(false)
+    local stderr = uv.new_pipe(false)
     local pythonVenvPath = vim.env.VIRTUAL_ENV
-    if not pythonVenvPath then
-        error("Could not find the virtual environment. Have you sourced the activate script?")
+
+    local function extractURLS(input_data)
+        return table.concat(input_data)
+    end
+
+    local function showViritualText()
+        ui.setVirtualText(extractURLS(M.urls), args.rowNo)
     end
 
     local pythonPath =  pythonVenvPath .. "/bin/python"
-
     handle, pid = uv.spawn(pythonPath, {
-        args = {"/home/pulsar17/Projects/inkwebupgrade/try.py"},
+        args = {"/home/pulsar17/Projects/inkwebupgrade/try.py", args.viewName},
         stdio = {stdin, stdout, stderr},
-    }, onExit)
-
-    uv.read_start(stdout, onRead)
-    uv.write(stdin, viewName)
-    uv.shutdown(stdin, onshutdown)
-    return data
+    }, vim.schedule_wrap(function ()
+        stdout:read_stop()
+        stderr:read_stop()
+        stdout:close()
+        stdin:close()
+        handle:close()
+        showViritualText()
+        end)
+    )
+    --print(handle, pid)
+    uv.read_start(stdout, onread)
+    uv.read_start(stderr, onread)
 end
-
 return M
