@@ -18,9 +18,21 @@ local function onread(err, data)
     end
 end
 
-M. runPython = function (args)
+local function onerr(err, data)
+    assert(not err, err)
+    -- Ignore errors for now
+end
+
+local function getPythonScript()
+    local script = vim.api.nvim_get_runtime_file('**/djist/scripts/', false)[1]
+    if script == '' then
+        error('Could not find the Python script. It should be inside <runtimedir>/djist/scripts/ where runtimedir is a directory present in the runtimepath.')
+    end
+    return script .. 'get_urls.py'
+end
+
+M.runPython = function (args)
     M.urls = {}
-    local stdin = uv.new_pipe(false)
     local stdout = uv.new_pipe(false)
     local stderr = uv.new_pipe(false)
     local pythonVenvPath = vim.env.VIRTUAL_ENV
@@ -33,21 +45,23 @@ M. runPython = function (args)
         ui.setVirtualText(extractURLS(M.urls), args.rowNo)
     end
 
+    local pyScript = getPythonScript()
+
     local pythonPath =  pythonVenvPath .. "/bin/python"
     handle, pid = uv.spawn(pythonPath, {
-        args = {"/home/pulsar17/Projects/inkwebupgrade/try.py", args.viewName},
-        stdio = {stdin, stdout, stderr},
+        args = {pyScript, args.viewName},
+        stdio = {nil, stdout, stderr},
     }, vim.schedule_wrap(function ()
         stdout:read_stop()
         stderr:read_stop()
         stdout:close()
-        stdin:close()
         handle:close()
         showViritualText()
         end)
     )
-    --print(handle, pid)
+
     uv.read_start(stdout, onread)
-    uv.read_start(stderr, onread)
+    uv.read_start(stderr, onerr)
 end
+
 return M
