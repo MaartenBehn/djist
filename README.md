@@ -12,6 +12,8 @@ class ForumList(...) /forums/
 ...                  ^^^^^^^^
 ...
 ```
+![djist-working](https://user-images.githubusercontent.com/42387090/138939490-5570784b-50cd-46e4-8a4a-3d4877b31c07.gif)
+
 
 ## Install
 
